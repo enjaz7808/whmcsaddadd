@@ -1,0 +1,73 @@
+# WHMCS WhatsApp Cloud Addon - Git Ignore
+
+# Development files
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test files
+test/
+tests/
+phpunit.xml
+
+# Documentation builds
+docs/_build/
+
+# Cache files
+cache/
+*.cache
+
+# Configuration override files
+config.local.php
+settings.local.php
+
+# Dependencies (if using Composer)
+vendor/
+composer.lock
+
+# Build artifacts
+dist/
+build/
+
+# Temporary uploads
+uploads/temp/
+tmp/
+
+# Log files
+logs/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Database exports
+*.sql
+*.dump
+
+# Sensitive data
+secrets.txt
+keys/
+certificates/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
