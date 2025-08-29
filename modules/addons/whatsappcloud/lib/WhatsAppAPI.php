@@ -40,38 +40,6 @@ class WhatsAppAPI
     }
     
     /**
-     * Send a template message
-     */
-    public function sendTemplate($to, $templateName, $languageCode = 'ar', $parameters = [])
-    {
-        $url = $this->baseUrl . $this->apiVersion . '/' . $this->phoneNumberId . '/messages';
-        
-        $data = [
-            'messaging_product' => 'whatsapp',
-            'recipient_type' => 'individual',
-            'to' => $this->formatPhoneNumber($to),
-            'type' => 'template',
-            'template' => [
-                'name' => $templateName,
-                'language' => [
-                    'code' => $languageCode
-                ]
-            ]
-        ];
-        
-        if (!empty($parameters)) {
-            $data['template']['components'] = [
-                [
-                    'type' => 'body',
-                    'parameters' => $parameters
-                ]
-            ];
-        }
-        
-        return $this->makeRequest($url, $data);
-    }
-    
-    /**
      * Send interactive message with buttons
      */
     public function sendInteractiveMessage($to, $bodyText, $buttons)
@@ -79,7 +47,7 @@ class WhatsAppAPI
         $url = $this->baseUrl . $this->apiVersion . '/' . $this->phoneNumberId . '/messages';
         
         $interactiveButtons = [];
-        foreach ($buttons as $index => $button) {
+        foreach ($buttons as $button) {
             $interactiveButtons[] = [
                 'type' => 'reply',
                 'reply' => [
@@ -148,7 +116,7 @@ class WhatsAppAPI
     public function sendWelcomeMessage($to, $language = 'ar')
     {
         $messages = [
-            'ar' => "🎉 أهلاً وسهلاً! \n\nنحن سعداء لانضمامك إلينا. يمكنك الآن التواصل معنا عبر واتساب للحصول على الدعم والمساعدة.\n\n📞 للمساعدة: اكتب 'مساعدة'\n💬 للدردشة مع المبيعات: اكتب 'مبيعات'\n🎫 لفتح تذكرة دعم: اكتب 'دعم'",
+            'ar' => "🎉 أهلاً وسهلاً! \n\nنحن سعداء لوجودك معنا. يمكنك الآن التواصل معنا عبر واتساب للحصول على الدعم والمساعدة.\n\n📞 للمساعدة: اكتب 'مساعدة'\n💬 للتحدث مع المبيعات: اكتب 'مبيعات'\n🎫 لفتح تذكرة دعم: اكتب 'دعم'",
             'en' => "🎉 Welcome! \n\nWe're happy to have you with us. You can now communicate with us via WhatsApp for support and assistance.\n\n📞 For help: type 'help'\n💬 To chat with sales: type 'sales'\n🎫 To open support ticket: type 'support'"
         ];
         
@@ -156,18 +124,80 @@ class WhatsAppAPI
     }
     
     /**
-     * Get webhook verification challenge
+     * Test API connection
      */
-    public function verifyWebhook($verifyToken, $challenge, $mode)
+    public function testConnection()
     {
-        global $CONFIG;
-        $expectedToken = $CONFIG['whatsappcloud_webhook_verify_token'] ?? '';
+        $url = $this->baseUrl . $this->apiVersion . '/' . $this->businessAccountId;
         
-        if ($mode === 'subscribe' && $verifyToken === $expectedToken) {
-            return $challenge;
+        $headers = [
+            'Authorization: Bearer ' . $this->accessToken,
+            'Content-Type: application/json'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            return ['success' => false, 'error' => 'cURL Error: ' . $error];
         }
         
-        return false;
+        if ($httpCode === 200) {
+            return ['success' => true, 'data' => json_decode($response, true)];
+        } else {
+            return ['success' => false, 'error' => 'HTTP ' . $httpCode . ': ' . $response];
+        }
+    }
+    
+    /**
+     * Test webhook connection
+     */
+    public function testWebhook()
+    {
+        global $CONFIG;
+        $webhookUrl = 'https://enjaz-web.com/billing/modules/addons/whatsappcloud/webhook.php';
+        
+        // Try to make a test request to the webhook
+        $testData = [
+            'object' => 'whatsapp_business_account',
+            'entry' => []
+        ];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $webhookUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($testData));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'User-Agent: WHMCS-WhatsApp-Test'
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            return ['success' => false, 'error' => 'cURL Error: ' . $error];
+        }
+        
+        if ($httpCode === 200) {
+            return ['success' => true, 'message' => 'Webhook is accessible and responding'];
+        } else {
+            return ['success' => false, 'error' => 'HTTP ' . $httpCode . ': ' . $response];
+        }
     }
     
     /**
@@ -274,29 +304,29 @@ class WhatsAppAPI
         switch ($command) {
             case 'help':
                 $helpMessage = $language === 'ar' ? 
-                    "كيف يمكننا مساعدتك؟\n\n🛍️ للمبيعات: اكتب 'مبيعات'\n🎫 للدعم الفني: اكتب 'دعم'\n📋 لعرض الفواتير: اكتب 'فواتير'" :
-                    "How can we help you?\n\n🛍️ For sales: type 'sales'\n🎫 For support: type 'support'\n📋 For invoices: type 'invoices'";
+                    "📋 قائمة الأوامر المتاحة:\n\n🆘 مساعدة - عرض هذه القائمة\n💼 مبيعات - التحدث مع فريق المبيعات\n🎫 دعم - فتح تذكرة دعم فني" :
+                    "📋 Available Commands:\n\n🆘 help - Show this menu\n💼 sales - Chat with sales team\n🎫 support - Open support ticket";
                 $this->sendMessage($from, $helpMessage);
                 break;
                 
             case 'sales':
                 $salesMessage = $language === 'ar' ?
-                    "مرحباً! أنا هنا لمساعدتك في الاستفسارات التجارية. كيف يمكنني مساعدتك اليوم؟" :
-                    "Hello! I'm here to help with sales inquiries. How can I assist you today?";
+                    "💼 مرحباً بك في قسم المبيعات!\n\nسيتم توصيلك مع أحد ممثلي المبيعات قريباً. يرجى وصف استفسارك وسنعود إليك في أقرب وقت." :
+                    "💼 Welcome to Sales!\n\nYou'll be connected with a sales representative soon. Please describe your inquiry and we'll get back to you shortly.";
                 $this->sendMessage($from, $salesMessage);
                 break;
                 
             case 'support':
                 $supportMessage = $language === 'ar' ?
-                    "سيتم توصيلك بفريق الدعم الفني. يرجى وصف مشكلتك وسنتواصل معك قريباً." :
-                    "You'll be connected to our technical support team. Please describe your issue and we'll get back to you soon.";
+                    "🎫 مرحباً بك في الدعم الفني!\n\nيرجى وصف المشكلة التي تواجهها بالتفصيل وسيتم فتح تذكرة دعم لك." :
+                    "🎫 Welcome to Technical Support!\n\nPlease describe the issue you're facing in detail and a support ticket will be created for you.";
                 $this->sendMessage($from, $supportMessage);
                 break;
                 
             default:
                 $defaultMessage = $language === 'ar' ?
-                    "شكراً لرسالتك. سيتم الرد عليك في أقرب وقت ممكن." :
-                    "Thank you for your message. We'll get back to you as soon as possible.";
+                    "شكراً لرسالتك! تم استلامها وسيتم الرد عليك قريباً.\n\nللمساعدة اكتب: مساعدة" :
+                    "Thank you for your message! We have received it and will reply soon.\n\nFor help type: help";
                 $this->sendMessage($from, $defaultMessage);
         }
     }
@@ -339,171 +369,197 @@ class WhatsAppAPI
     }
     
     /**
-     * Test webhook connection
+     * Store message in database
      */
-    public function testWebhook()
+    private function storeMessage($phoneNumber, $messageId, $direction, $messageData)
     {
-        global $CONFIG;
-        $webhookUrl = 'https://enjaz-web.com/billing/modules/addons/whatsappcloud/webhook.php';
+        $conversationId = $this->getConversationId($phoneNumber);
         
-        // Try to make a test request to the webhook
-        $testData = [
-            'object' => 'whatsapp_business_account',
-            'entry' => []
-        ];
+        if (!$conversationId) return false;
         
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $webhookUrl);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($testData));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'X-Hub-Signature-256: sha256=' . hash_hmac('sha256', json_encode($testData), $CONFIG['whatsappcloud_app_secret'] ?? '')
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $content = '';
+        $messageType = $messageData['type'] ?? 'text';
         
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-        return [
-            'success' => $httpCode === 200,
-            'error' => $httpCode !== 200 ? "HTTP $httpCode" : null
-        ];
-    }
-    
-    /**
-     * Helper methods
-     */
-    private function formatPhoneNumber($number)
-    {
-        // Remove any non-digit characters
-        $number = preg_replace('/[^0-9]/', '', $number);
-        
-        // Add country code if not present (assuming Saudi Arabia +966)
-        if (!str_starts_with($number, '966') && !str_starts_with($number, '+966')) {
-            if (str_starts_with($number, '0')) {
-                $number = '966' . substr($number, 1);
-            } else {
-                $number = '966' . $number;
-            }
+        switch ($messageType) {
+            case 'text':
+                $content = $messageData['text']['body'] ?? '';
+                break;
+            case 'interactive':
+                $content = json_encode($messageData['interactive']);
+                break;
+            default:
+                $content = json_encode($messageData);
         }
         
-        return $number;
-    }
-    
-    private function makeRequest($url, $data)
-    {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $this->accessToken,
-            'Content-Type: application/json'
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-        $decodedResponse = json_decode($response, true);
-        
-        return [
-            'success' => $httpCode === 200,
-            'data' => $decodedResponse,
-            'error' => $httpCode !== 200 ? ($decodedResponse['error']['message'] ?? "HTTP $httpCode") : null
-        ];
-    }
-    
-    private function storeMessage($phone, $messageId, $direction, $messageData)
-    {
         $query = "INSERT INTO mod_whatsappcloud_messages 
                   (conversation_id, message_id, direction, message_type, content) 
                   VALUES (?, ?, ?, ?, ?)";
         
-        $conversationId = $this->getConversationId($phone);
-        $messageType = $messageData['type'];
-        $content = json_encode($messageData);
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 'issss', $conversationId, $messageId, $direction, $messageType, $content);
         
-        full_query($query, [$conversationId, $messageId, $direction, $messageType, $content]);
+        return mysqli_stmt_execute($stmt);
     }
     
-    private function getOrCreateConversation($phone, $contact)
+    /**
+     * Get or create conversation
+     */
+    private function getOrCreateConversation($phoneNumber, $contact)
     {
         $query = "SELECT * FROM mod_whatsappcloud_conversations WHERE phone_number = ?";
-        $result = full_query($query, [$phone]);
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 's', $phoneNumber);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
         
-        if ($result->num_rows > 0) {
-            return $result->fetch_assoc();
+        if ($conversation = mysqli_fetch_assoc($result)) {
+            return $conversation;
         }
         
         // Create new conversation
-        $clientId = $this->findClientByPhone($phone);
-        $conversationId = uniqid('conv_');
+        $contactName = $contact['profile']['name'] ?? $phoneNumber;
+        $query = "INSERT INTO mod_whatsappcloud_conversations (phone_number, contact_name) VALUES (?, ?)";
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 'ss', $phoneNumber, $contactName);
         
-        $query = "INSERT INTO mod_whatsappcloud_conversations 
-                  (client_id, phone_number, conversation_id, status) 
-                  VALUES (?, ?, ?, 'pending')";
+        if (mysqli_stmt_execute($stmt)) {
+            $conversationId = mysqli_insert_id($GLOBALS['dbh']);
+            return [
+                'id' => $conversationId,
+                'phone_number' => $phoneNumber,
+                'contact_name' => $contactName,
+                'language' => 'ar',
+                'status' => 'pending'
+            ];
+        }
         
-        full_query($query, [$clientId, $phone, $conversationId]);
-        
-        return [
-            'id' => mysql_insert_id(),
-            'client_id' => $clientId,
-            'phone_number' => $phone,
-            'conversation_id' => $conversationId,
-            'status' => 'pending',
-            'language' => 'ar'
-        ];
+        return null;
     }
     
-    private function findClientByPhone($phone)
-    {
-        // Try to find client by phone number in WHMCS
-        $query = "SELECT id FROM tblclients WHERE phonenumber = ? OR phonenumber = ? LIMIT 1";
-        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-        $result = full_query($query, [$phone, $cleanPhone]);
-        
-        return $result->num_rows > 0 ? $result->fetch_assoc()['id'] : 0;
-    }
-    
-    private function getConversationId($phone)
-    {
-        $query = "SELECT id FROM mod_whatsappcloud_conversations WHERE phone_number = ?";
-        $result = full_query($query, [$phone]);
-        
-        return $result->num_rows > 0 ? $result->fetch_assoc()['id'] : 0;
-    }
-    
-    private function updateConversationStatus($phone, $status)
+    /**
+     * Update conversation status
+     */
+    private function updateConversationStatus($phoneNumber, $status)
     {
         $query = "UPDATE mod_whatsappcloud_conversations SET status = ? WHERE phone_number = ?";
-        full_query($query, [$status, $phone]);
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 'ss', $status, $phoneNumber);
+        
+        return mysqli_stmt_execute($stmt);
     }
     
-    private function updateConversationLanguage($phone, $language)
+    /**
+     * Update conversation language
+     */
+    private function updateConversationLanguage($phoneNumber, $language)
     {
         $query = "UPDATE mod_whatsappcloud_conversations SET language = ? WHERE phone_number = ?";
-        full_query($query, [$language, $phone]);
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 'ss', $language, $phoneNumber);
+        
+        return mysqli_stmt_execute($stmt);
     }
     
+    /**
+     * Get conversation ID
+     */
+    private function getConversationId($phoneNumber)
+    {
+        $query = "SELECT id FROM mod_whatsappcloud_conversations WHERE phone_number = ?";
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 's', $phoneNumber);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        
+        if ($row = mysqli_fetch_assoc($result)) {
+            return $row['id'];
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Check if bot is enabled
+     */
     private function isBotEnabled()
     {
-        global $CONFIG;
-        return ($CONFIG['whatsappcloud_enable_bot'] ?? 'yes') === 'yes';
+        $query = "SELECT value FROM tbladdonmodules WHERE module = 'whatsappcloud' AND setting = 'enable_bot'";
+        $result = full_query($query);
+        
+        if ($result && $result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            return $row['value'] === 'on';
+        }
+        
+        return false;
     }
     
+    /**
+     * Process message status update
+     */
     private function processMessageStatus($status)
     {
-        // Update message status in database
         $messageId = $status['id'];
-        $newStatus = $status['status'];
+        $statusValue = $status['status'];
         
         $query = "UPDATE mod_whatsappcloud_messages SET status = ? WHERE message_id = ?";
-        full_query($query, [$newStatus, $messageId]);
+        $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+        mysqli_stmt_bind_param($stmt, 'ss', $statusValue, $messageId);
+        
+        return mysqli_stmt_execute($stmt);
+    }
+    
+    /**
+     * Format phone number
+     */
+    private function formatPhoneNumber($phoneNumber)
+    {
+        // Remove any non-numeric characters except +
+        $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
+        
+        // Add + if not present
+        if (!str_starts_with($phoneNumber, '+')) {
+            $phoneNumber = '+' . $phoneNumber;
+        }
+        
+        return $phoneNumber;
+    }
+    
+    /**
+     * Make HTTP request to WhatsApp API
+     */
+    private function makeRequest($url, $data)
+    {
+        $headers = [
+            'Authorization: Bearer ' . $this->accessToken,
+            'Content-Type: application/json'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            return ['success' => false, 'error' => 'cURL Error: ' . $error];
+        }
+        
+        $responseData = json_decode($response, true);
+        
+        if ($httpCode === 200 || $httpCode === 201) {
+            return ['success' => true, 'data' => $responseData];
+        } else {
+            $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
+            return ['success' => false, 'error' => 'HTTP ' . $httpCode . ': ' . $errorMessage];
+        }
     }
 }

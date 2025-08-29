@@ -17,48 +17,36 @@ $defaultLanguage = $vars['default_language'] ?? 'ar';
     <h2>🤖 البوت التفاعلي المتقدم</h2>
     
     <!-- Bot Status -->
-    <div class="bot-status" style="background: <?php echo $botEnabled ? '#d4edda' : '#f8d7da'; ?>; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+    <div class="info-card" style="background: <?php echo $botEnabled ? '#d4edda' : '#f8d7da'; ?>;">
         <h3>
             <span class="status-indicator <?php echo $botEnabled ? 'status-connected' : 'status-disconnected'; ?>"></span>
-            حالة البوت: <?php echo $botEnabled ? 'مفعل ومتصل ✅' : 'معطل ❌'; ?>
+            حالة البوت
         </h3>
         
-        <p style="margin: 10px 0 0 0;">
-            <?php if ($botEnabled): ?>
-                البوت التفاعلي يعمل الآن ويرد تلقائياً على رسائل العملاء
-            <?php else: ?>
-                البوت معطل حالياً. قم بتفعيله من إعدادات الإضافة
-            <?php endif; ?>
-        </p>
+        <?php if ($botEnabled): ?>
+            <div class="alert alert-success">
+                ✅ البوت التفاعلي مُفعل ويعمل بشكل طبيعي
+            </div>
+        <?php else: ?>
+            <div class="alert alert-warning">
+                ⚠️ البوت التفاعلي معطل. قم بتفعيله من الإعدادات العامة للإضافة.
+            </div>
+        <?php endif; ?>
     </div>
     
     <!-- Bot Configuration -->
     <form method="post">
         <input type="hidden" name="tab" value="bot">
         
-        <div class="bot-config" style="background: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <div class="info-card">
             <h3>⚙️ إعدادات البوت</h3>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+            <div class="config-grid">
                 <div class="form-group">
                     <label>🌐 اللغة الافتراضية:</label>
                     <select name="default_language" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                         <option value="ar" <?php echo $defaultLanguage === 'ar' ? 'selected' : ''; ?>>العربية 🇸🇦</option>
                         <option value="en" <?php echo $defaultLanguage === 'en' ? 'selected' : ''; ?>>English 🇺🇸</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>⏱️ وقت الاستجابة (ثواني):</label>
-                    <input type="number" name="response_delay" value="2" min="0" max="10" 
-                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                </div>
-                
-                <div class="form-group">
-                    <label>🔄 إعادة المحاولة التلقائية:</label>
-                    <select name="auto_retry" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="yes">مفعل</option>
-                        <option value="no">معطل</option>
                     </select>
                 </div>
                 
@@ -80,16 +68,16 @@ $defaultLanguage = $vars['default_language'] ?? 'ar';
     </form>
     
     <!-- Bot Flow Preview -->
-    <div class="bot-flow" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <div class="info-card">
         <h3>🔄 سير عمل البوت التفاعلي</h3>
         
         <div class="flow-steps" style="margin-top: 15px;">
             <!-- Step 1: Initial Contact -->
-            <div class="flow-step" style="display: flex; align-items: flex-start; margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-right: 4px solid #007bff;">
-                <div style="background: #007bff; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin-left: 15px; font-weight: bold;">1</div>
+            <div class="flow-step" style="border-right-color: #007bff;">
+                <div class="flow-step-number" style="background: #007bff;">1</div>
                 <div>
-                    <h4 style="margin: 0 0 8px 0; color: #007bff;">📨 استقبال الرسالة الأولى</h4>
-                    <p style="margin: 0; color: #6c757d;">عندما يرسل العميل أول رسالة، يتم إرسال طلب الموافقة تلقائياً</p>
+                    <h4 style="color: #007bff;">📨 استقبال الرسالة الأولى</h4>
+                    <p>عندما يرسل العميل أول رسالة، يتم إرسال طلب الموافقة تلقائياً</p>
                     <div style="background: #e3f2fd; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 14px;">
                         "هل توافق على تلقي الرسائل من نظامنا؟<br>
                         Do you agree to receive messages from our system?"<br>
@@ -99,11 +87,11 @@ $defaultLanguage = $vars['default_language'] ?? 'ar';
             </div>
             
             <!-- Step 2: Approval -->
-            <div class="flow-step" style="display: flex; align-items: flex-start; margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-right: 4px solid #28a745;">
-                <div style="background: #28a745; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin-left: 15px; font-weight: bold;">2</div>
+            <div class="flow-step" style="border-right-color: #28a745;">
+                <div class="flow-step-number" style="background: #28a745;">2</div>
                 <div>
-                    <h4 style="margin: 0 0 8px 0; color: #28a745;">✅ الموافقة على التواصل</h4>
-                    <p style="margin: 0; color: #6c757d;">إذا وافق العميل، يتم إرسال خيارات اللغة</p>
+                    <h4 style="color: #28a745;">✅ الموافقة على التواصل</h4>
+                    <p>إذا وافق العميل، يتم إرسال خيارات اللغة</p>
                     <div style="background: #d4edda; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 14px;">
                         "Please select your preferred language<br>
                         الرجاء اختيار لغتك المفضلة"<br>
@@ -113,140 +101,245 @@ $defaultLanguage = $vars['default_language'] ?? 'ar';
             </div>
             
             <!-- Step 3: Language Selection -->
-            <div class="flow-step" style="display: flex; align-items: flex-start; margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-right: 4px solid #ffc107;">
-                <div style="background: #ffc107; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin-left: 15px; font-weight: bold;">3</div>
+            <div class="flow-step" style="border-right-color: #17a2b8;">
+                <div class="flow-step-number" style="background: #17a2b8;">3</div>
                 <div>
-                    <h4 style="margin: 0 0 8px 0; color: #ffc107;">🌐 اختيار اللغة</h4>
-                    <p style="margin: 0; color: #6c757d;">بعد اختيار اللغة، يتم إرسال رسالة ترحيبية مخصصة</p>
-                    <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 14px;">
-                        <strong>باللغة العربية:</strong><br>
-                        "🎉 أهلاً وسهلاً!<br>
-                        نحن سعداء لانضمامك إلينا..."<br><br>
-                        <strong>باللغة الإنجليزية:</strong><br>
-                        "🎉 Welcome!<br>
-                        We're happy to have you with us..."
+                    <h4 style="color: #17a2b8;">🌍 اختيار اللغة</h4>
+                    <p>بعد اختيار اللغة، يتم إرسال رسالة ترحيبية شاملة</p>
+                    <div style="background: #d1ecf1; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 14px;">
+                        "🎉 أهلاً وسهلاً!<br><br>
+                        نحن سعداء لوجودك معنا...<br>
+                        📞 للمساعدة: اكتب 'مساعدة'<br>
+                        💬 للمبيعات: اكتب 'مبيعات'"
                     </div>
                 </div>
             </div>
             
-            <!-- Step 4: Interactive Commands -->
-            <div class="flow-step" style="display: flex; align-items: flex-start; margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-right: 4px solid #6f42c1;">
-                <div style="background: #6f42c1; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin-left: 15px; font-weight: bold;">4</div>
+            <!-- Step 4: Commands -->
+            <div class="flow-step" style="border-right-color: #ffc107;">
+                <div class="flow-step-number" style="background: #ffc107; color: #000;">4</div>
                 <div>
-                    <h4 style="margin: 0 0 8px 0; color: #6f42c1;">🎛️ الأوامر التفاعلية</h4>
-                    <p style="margin: 0; color: #6c757d;">البوت يتفاعل مع أوامر العملاء ويقدم المساعدة المناسبة</p>
-                    <div style="background: #f3e5f5; padding: 10px; border-radius: 4px; margin-top: 10px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
-                            <div><strong>العربية:</strong> مساعدة، مبيعات، دعم</div>
-                            <div><strong>English:</strong> help, sales, support</div>
-                        </div>
+                    <h4 style="color: #856404;">⚡ الأوامر التفاعلية</h4>
+                    <p>البوت يستجيب للأوامر المختلفة ويوجه العملاء للأقسام المناسبة</p>
+                    <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 14px;">
+                        • مساعدة / help - عرض قائمة الأوامر<br>
+                        • مبيعات / sales - قسم المبيعات<br>
+                        • دعم / support - الدعم الفني
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Quick Response Templates -->
-    <div class="response-templates" style="background: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h3>📝 قوالب الردود السريعة</h3>
+    <!-- Bot Commands -->
+    <div class="info-card">
+        <h3>🎯 أوامر البوت المتاحة</h3>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
-            <!-- Arabic Templates -->
+        <div class="config-grid">
             <div>
-                <h4 style="color: #007bff;">🇸🇦 القوالب العربية</h4>
-                
-                <div class="template-item" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong>رسالة الترحيب:</strong>
-                    <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                        🎉 أهلاً وسهلاً! نحن سعداء لانضمامك إلينا...
-                    </div>
-                </div>
-                
-                <div class="template-item" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong>رد المساعدة:</strong>
-                    <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                        كيف يمكننا مساعدتك؟ 🛍️ للمبيعات: اكتب 'مبيعات'...
-                    </div>
-                </div>
-                
-                <div class="template-item" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong>رد المبيعات:</strong>
-                    <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                        مرحباً! أنا هنا لمساعدتك في الاستفسارات التجارية...
-                    </div>
-                </div>
+                <h4>🆘 أوامر المساعدة</h4>
+                <ul style="margin: 10px 0; padding-right: 20px;">
+                    <li>مساعدة، help</li>
+                    <li>قائمة، menu</li>
+                    <li>خدمات، services</li>
+                </ul>
             </div>
             
-            <!-- English Templates -->
             <div>
-                <h4 style="color: #28a745;">🇺🇸 English Templates</h4>
-                
-                <div class="template-item" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong>Welcome Message:</strong>
-                    <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                        🎉 Welcome! We're happy to have you with us...
-                    </div>
-                </div>
-                
-                <div class="template-item" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong>Help Response:</strong>
-                    <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                        How can we help you? 🛍️ For sales: type 'sales'...
-                    </div>
-                </div>
-                
-                <div class="template-item" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong>Sales Response:</strong>
-                    <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                        Hello! I'm here to help with sales inquiries...
-                    </div>
-                </div>
+                <h4>💼 أوامر المبيعات</h4>
+                <ul style="margin: 10px 0; padding-right: 20px;">
+                    <li>مبيعات، sales</li>
+                    <li>شراء، buy</li>
+                    <li>أسعار، prices</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h4>🎫 أوامر الدعم</h4>
+                <ul style="margin: 10px 0; padding-right: 20px;">
+                    <li>دعم، support</li>
+                    <li>مشكلة، problem</li>
+                    <li>تذكرة، ticket</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h4>ℹ️ أوامر المعلومات</h4>
+                <ul style="margin: 10px 0; padding-right: 20px;">
+                    <li>معلومات، info</li>
+                    <li>عنا، about</li>
+                    <li>اتصال، contact</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bot Response Templates -->
+    <div class="info-card">
+        <h3>💬 قوالب الردود</h3>
+        
+        <div style="margin-top: 15px;">
+            <div class="form-group">
+                <label>🎉 رسالة الترحيب (عربي):</label>
+                <textarea rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" readonly>🎉 أهلاً وسهلاً! 
+
+نحن سعداء لوجودك معنا. يمكنك الآن التواصل معنا عبر واتساب للحصول على الدعم والمساعدة.
+
+📞 للمساعدة: اكتب 'مساعدة'
+💬 للتحدث مع المبيعات: اكتب 'مبيعات'
+🎫 لفتح تذكرة دعم: اكتب 'دعم'</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>🎉 رسالة الترحيب (English):</label>
+                <textarea rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" readonly>🎉 Welcome! 
+
+We're happy to have you with us. You can now communicate with us via WhatsApp for support and assistance.
+
+📞 For help: type 'help'
+💬 To chat with sales: type 'sales'
+🎫 To open support ticket: type 'support'</textarea>
             </div>
         </div>
     </div>
     
     <!-- Bot Analytics -->
-    <div class="bot-analytics" style="background: #e3f2fd; padding: 20px; border-radius: 8px;">
+    <div class="info-card">
         <h3>📊 إحصائيات البوت</h3>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #007bff;">24</div>
-                <div style="color: #6c757d; font-size: 14px;">ردود تلقائية اليوم</div>
+        <?php
+        // Get bot statistics
+        $botStats = [
+            'total_interactions' => 0,
+            'approval_rate' => 0,
+            'language_preferences' => ['ar' => 0, 'en' => 0],
+            'popular_commands' => []
+        ];
+        
+        try {
+            // Get total conversations that went through bot
+            $query = "SELECT COUNT(*) as total FROM mod_whatsappcloud_conversations WHERE status != 'pending'";
+            $result = full_query($query);
+            if ($result) {
+                $botStats['total_interactions'] = $result->fetch_assoc()['total'];
+            }
+            
+            // Calculate approval rate
+            $query = "SELECT 
+                        COUNT(CASE WHEN status = 'active' OR status = 'completed' THEN 1 END) as approved,
+                        COUNT(*) as total
+                      FROM mod_whatsappcloud_conversations";
+            $result = full_query($query);
+            if ($result) {
+                $data = $result->fetch_assoc();
+                $botStats['approval_rate'] = $data['total'] > 0 ? round(($data['approved'] / $data['total']) * 100, 1) : 0;
+            }
+            
+            // Get language preferences
+            $query = "SELECT language, COUNT(*) as count FROM mod_whatsappcloud_conversations GROUP BY language";
+            $result = full_query($query);
+            if ($result) {
+                while ($row = $result->fetch_assoc()) {
+                    $botStats['language_preferences'][$row['language']] = $row['count'];
+                }
+            }
+        } catch (Exception $e) {
+            // Handle database errors silently
+        }
+        ?>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number"><?php echo number_format($botStats['total_interactions']); ?></div>
+                <div class="stat-label">تفاعلات البوت</div>
             </div>
             
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #28a745;">18</div>
-                <div style="color: #6c757d; font-size: 14px;">موافقات جديدة</div>
+            <div class="stat-card">
+                <div class="stat-number"><?php echo $botStats['approval_rate']; ?>%</div>
+                <div class="stat-label">معدل الموافقة</div>
             </div>
             
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #ffc107;">12</div>
-                <div style="color: #6c757d; font-size: 14px;">استفسارات مبيعات</div>
+            <div class="stat-card">
+                <div class="stat-number"><?php echo number_format($botStats['language_preferences']['ar'] ?? 0); ?></div>
+                <div class="stat-label">مستخدمو العربية</div>
             </div>
             
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #dc3545;">3</div>
-                <div style="color: #6c757d; font-size: 14px;">طلبات دعم</div>
+            <div class="stat-card">
+                <div class="stat-number"><?php echo number_format($botStats['language_preferences']['en'] ?? 0); ?></div>
+                <div class="stat-label">English Users</div>
             </div>
         </div>
+    </div>
+    
+    <!-- Test Bot -->
+    <div class="info-card">
+        <h3>🧪 اختبار البوت</h3>
         
-        <div style="margin-top: 15px; text-align: center;">
-            <button class="btn btn-secondary" onclick="refreshAnalytics()">
-                🔄 تحديث الإحصائيات
+        <p style="color: #6c757d; margin-bottom: 15px;">
+            يمكنك اختبار البوت بإرسال رسالة تجريبية إلى رقم الواتساب المربوط
+        </p>
+        
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+            <button type="button" class="btn" onclick="simulateUserMessage('مرحبا')">
+                💬 محاكاة رسالة "مرحبا"
+            </button>
+            
+            <button type="button" class="btn" onclick="simulateUserMessage('مساعدة')">
+                🆘 محاكاة أمر "مساعدة"
+            </button>
+            
+            <button type="button" class="btn" onclick="simulateUserMessage('مبيعات')">
+                💼 محاكاة أمر "مبيعات"
             </button>
         </div>
+        
+        <div id="simulation-result" style="margin-top: 15px; padding: 15px; border-radius: 6px; display: none;"></div>
     </div>
 </div>
 
 <script>
-function refreshAnalytics() {
-    // Add AJAX call to refresh analytics
-    alert('سيتم تحديث الإحصائيات...');
+function simulateUserMessage(message) {
+    const resultDiv = document.getElementById('simulation-result');
+    resultDiv.style.display = 'block';
+    resultDiv.style.background = '#e3f2fd';
+    resultDiv.style.border = '1px solid #2196F3';
+    
+    resultDiv.innerHTML = `
+        <h5>🤖 استجابة البوت التفاعلي:</h5>
+        <p><strong>الرسالة المرسلة:</strong> "${message}"</p>
+        <p><strong>الرد المتوقع:</strong></p>
+        <div style="background: white; padding: 10px; border-radius: 4px; margin-top: 10px;">
+            ${getBotResponse(message)}
+        </div>
+    `;
 }
 
-// Real-time bot status monitoring
-setInterval(function() {
-    // Check bot status via AJAX
-}, 30000);
+function getBotResponse(message) {
+    const msg = message.toLowerCase();
+    
+    if (msg.includes('مرحبا') || msg.includes('السلام') || msg.includes('hello')) {
+        return `
+            هل توافق على تلقي الرسائل من نظامنا؟<br>
+            Do you agree to receive messages from our system?<br><br>
+            <strong>[موافق / Approve] [رفض / Decline]</strong>
+        `;
+    } else if (msg.includes('مساعدة') || msg.includes('help')) {
+        return `
+            📋 قائمة الأوامر المتاحة:<br><br>
+            🆘 مساعدة - عرض هذه القائمة<br>
+            💼 مبيعات - التحدث مع فريق المبيعات<br>
+            🎫 دعم - فتح تذكرة دعم فني
+        `;
+    } else if (msg.includes('مبيعات') || msg.includes('sales')) {
+        return `
+            💼 مرحباً بك في قسم المبيعات!<br><br>
+            سيتم توصيلك مع أحد ممثلي المبيعات قريباً. يرجى وصف استفسارك وسنعود إليك في أقرب وقت.
+        `;
+    } else {
+        return `
+            شكراً لرسالتك! تم استلامها وسيتم الرد عليك قريباً.<br><br>
+            للمساعدة اكتب: مساعدة
+        `;
+    }
+}
 </script>

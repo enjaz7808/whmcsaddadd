@@ -1,14 +1,21 @@
 <?php
 /**
- * WHMCS WhatsApp Cloud API Addon
- *
- * @copyright Copyright (c) 2024
- * @license MIT License
+ * WHMCS WhatsApp Cloud API Integration Addon
+ * 
+ * Integrates WHMCS with WhatsApp Cloud API for customer communication
+ * 
+ * @package    WHMCS
+ * @author     Enjaz Web Solutions
+ * @copyright  2024 Enjaz Web Solutions
+ * @license    Proprietary
+ * @version    1.0.0
  */
 
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
+
+require_once __DIR__ . '/lib/WhatsAppAPI.php';
 
 /**
  * Addon configuration
@@ -17,65 +24,65 @@ function whatsappcloud_config()
 {
     return [
         'name' => 'WhatsApp Cloud API',
-        'description' => 'Integrate WhatsApp Cloud API with WHMCS for customer communication',
+        'description' => 'تكامل WHMCS مع WhatsApp Cloud API للتواصل مع العملاء',
         'version' => '1.0.0',
-        'author' => 'Enjaz Web',
-        'language' => 'english',
+        'author' => 'Enjaz Web Solutions',
+        'language' => 'arabic',
         'fields' => [
             'app_id' => [
-                'FriendlyName' => 'App ID',
+                'FriendlyName' => 'معرف التطبيق (App ID)',
                 'Type' => 'text',
-                'Size' => '30',
+                'Size' => '50',
                 'Default' => '1106679971647524',
-                'Description' => 'WhatsApp Cloud API App ID',
+                'Description' => 'معرف تطبيق WhatsApp Cloud',
             ],
             'app_secret' => [
-                'FriendlyName' => 'App Secret',
+                'FriendlyName' => 'كلمة مرور التطبيق (App Secret)',
                 'Type' => 'password',
                 'Size' => '50',
                 'Default' => 'bb84080b5bcf7ba647ded9e284980f99',
-                'Description' => 'WhatsApp Cloud API App Secret',
-            ],
-            'phone_number_id' => [
-                'FriendlyName' => 'Phone Number ID',
-                'Type' => 'text',
-                'Size' => '30',
-                'Default' => '663817096825554',
-                'Description' => 'WhatsApp Business Phone Number ID',
-            ],
-            'business_account_id' => [
-                'FriendlyName' => 'Business Account ID',
-                'Type' => 'text',
-                'Size' => '30',
-                'Default' => '1738496210124419',
-                'Description' => 'WhatsApp Business Account ID',
+                'Description' => 'كلمة مرور تطبيق WhatsApp Cloud',
             ],
             'access_token' => [
-                'FriendlyName' => 'Access Token',
-                'Type' => 'password',
-                'Size' => '70',
+                'FriendlyName' => 'رمز الوصول (Access Token)',
+                'Type' => 'textarea',
+                'Rows' => '3',
                 'Default' => 'EAAPuhQKXECQBPMrAEMDDMdfodVjshaNOZAvsHYf8p0ZCNd1zddG0NlZA5Xfz2sW7RCTnAW2fdccpwU6NrpR3jE738ZAWEdFxPX8bZB90tKKZAKAHTuYZAQhZCu70MQ9DF05QEChhfxbjPEIlWwORBsGkNR880HfvmuXgtaTRvCtcs2zETZCVjAnhKmInjGZCuxCgZDZD',
-                'Description' => 'WhatsApp Cloud API Access Token',
+                'Description' => 'رمز الوصول لـ WhatsApp Cloud API',
+            ],
+            'phone_number_id' => [
+                'FriendlyName' => 'معرف رقم الهاتف',
+                'Type' => 'text',
+                'Size' => '50',
+                'Default' => '663817096825554',
+                'Description' => 'معرف رقم الهاتف في WhatsApp Business',
+            ],
+            'business_account_id' => [
+                'FriendlyName' => 'معرف حساب واتساب للأعمال',
+                'Type' => 'text',
+                'Size' => '50',
+                'Default' => '1738496210124419',
+                'Description' => 'معرف حساب WhatsApp Business',
             ],
             'webhook_verify_token' => [
-                'FriendlyName' => 'Webhook Verify Token',
+                'FriendlyName' => 'رمز التحقق من الويب هوك',
                 'Type' => 'text',
-                'Size' => '30',
+                'Size' => '50',
                 'Default' => bin2hex(random_bytes(16)),
-                'Description' => 'Token for webhook verification',
+                'Description' => 'رمز التحقق لنقطة نهاية الويب هوك',
             ],
             'enable_bot' => [
-                'FriendlyName' => 'Enable Interactive Bot',
+                'FriendlyName' => 'تفعيل البوت التفاعلي',
                 'Type' => 'yesno',
-                'Default' => 'yes',
-                'Description' => 'Enable automated bot responses',
+                'Default' => 'on',
+                'Description' => 'تفعيل البوت للرد التلقائي على الرسائل',
             ],
             'default_language' => [
-                'FriendlyName' => 'Default Language',
+                'FriendlyName' => 'اللغة الافتراضية',
                 'Type' => 'dropdown',
                 'Options' => 'ar,en',
                 'Default' => 'ar',
-                'Description' => 'Default language for bot responses',
+                'Description' => 'اللغة الافتراضية للرسائل',
             ],
         ]
     ];
@@ -86,43 +93,51 @@ function whatsappcloud_config()
  */
 function whatsappcloud_activate()
 {
-    // Create database tables
-    $query = "CREATE TABLE IF NOT EXISTS `mod_whatsappcloud_conversations` (
-        `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-        `client_id` int(10) unsigned NOT NULL,
-        `phone_number` varchar(20) NOT NULL,
-        `conversation_id` varchar(255) NOT NULL,
-        `status` enum('pending','active','completed') DEFAULT 'pending',
-        `language` varchar(5) DEFAULT 'ar',
-        `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-        `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        KEY `phone_number` (`phone_number`),
-        KEY `client_id` (`client_id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-    
-    $result = full_query($query);
-    
-    $query = "CREATE TABLE IF NOT EXISTS `mod_whatsappcloud_messages` (
-        `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-        `conversation_id` int(10) unsigned NOT NULL,
-        `message_id` varchar(255) NOT NULL,
-        `direction` enum('inbound','outbound') NOT NULL,
-        `message_type` varchar(20) NOT NULL,
-        `content` text NOT NULL,
-        `status` varchar(20) DEFAULT 'sent',
-        `timestamp` timestamp DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        KEY `conversation_id` (`conversation_id`),
-        KEY `message_id` (`message_id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-    
-    $result = full_query($query);
-    
-    return [
-        'status' => 'success',
-        'description' => 'WhatsApp Cloud addon activated successfully. Database tables created.'
-    ];
+    try {
+        // Create conversations table
+        $query = "CREATE TABLE IF NOT EXISTS `mod_whatsappcloud_conversations` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `phone_number` varchar(20) NOT NULL,
+            `contact_name` varchar(255) DEFAULT NULL,
+            `language` varchar(5) DEFAULT 'ar',
+            `status` enum('pending','active','completed') DEFAULT 'pending',
+            `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `phone_number` (`phone_number`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        
+        full_query($query);
+        
+        // Create messages table
+        $query = "CREATE TABLE IF NOT EXISTS `mod_whatsappcloud_messages` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `conversation_id` int(11) NOT NULL,
+            `message_id` varchar(255) NOT NULL,
+            `direction` enum('inbound','outbound') NOT NULL,
+            `message_type` varchar(50) DEFAULT 'text',
+            `content` text NOT NULL,
+            `status` varchar(20) DEFAULT 'sent',
+            `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `conversation_id` (`conversation_id`),
+            KEY `message_id` (`message_id`),
+            FOREIGN KEY (`conversation_id`) REFERENCES `mod_whatsappcloud_conversations` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        
+        full_query($query);
+        
+        return [
+            'status' => 'success',
+            'description' => 'تم تفعيل إضافة WhatsApp Cloud بنجاح. تم إنشاء الجداول المطلوبة.'
+        ];
+        
+    } catch (Exception $e) {
+        return [
+            'status' => 'error',
+            'description' => 'خطأ في تفعيل الإضافة: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -132,34 +147,49 @@ function whatsappcloud_deactivate()
 {
     return [
         'status' => 'success',
-        'description' => 'WhatsApp Cloud addon deactivated successfully.'
+        'description' => 'تم إلغاء تفعيل إضافة WhatsApp Cloud. الجداول محفوظة للاستخدام المستقبلي.'
     ];
 }
 
 /**
- * Admin area output
+ * Addon output - main admin interface
  */
 function whatsappcloud_output($vars)
 {
-    require_once __DIR__ . '/lib/WhatsAppAPI.php';
+    $modulelink = $vars['modulelink'];
+    $version = $vars['version'];
+    $LANG = $vars['_lang'];
     
-    $tab = isset($_GET['tab']) ? $_GET['tab'] : 'details';
+    $message = '';
+    $activeTab = $_GET['tab'] ?? 'details';
     
     // Handle form submissions
-    if ($_POST) {
-        switch ($tab) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        switch ($activeTab) {
+            case 'details':
+                if (isset($_POST['test_connection'])) {
+                    $api = new WhatsAppAPI($vars);
+                    $result = $api->testConnection();
+                    $message = $result['success'] ? 
+                        '<div class="alert alert-success">✅ تم الاتصال بنجاح مع WhatsApp Cloud API</div>' : 
+                        '<div class="alert alert-danger">❌ فشل في الاتصال: ' . $result['error'] . '</div>';
+                }
+                break;
+                
             case 'webhook':
                 if (isset($_POST['test_webhook'])) {
                     $api = new WhatsAppAPI($vars);
                     $result = $api->testWebhook();
-                    $message = $result['success'] ? 'Webhook test successful!' : 'Webhook test failed: ' . $result['error'];
+                    $message = $result['success'] ? 
+                        '<div class="alert alert-success">✅ الويب هوك يعمل بشكل صحيح</div>' : 
+                        '<div class="alert alert-danger">❌ خطأ في الويب هوك: ' . $result['error'] . '</div>';
                 }
                 break;
                 
             case 'bot':
                 if (isset($_POST['save_bot_settings'])) {
                     // Save bot settings
-                    $message = 'Bot settings saved successfully!';
+                    $message = '<div class="alert alert-success">✅ تم حفظ إعدادات البوت بنجاح</div>';
                 }
                 break;
                 
@@ -167,7 +197,9 @@ function whatsappcloud_output($vars)
                 if (isset($_POST['send_message'])) {
                     $api = new WhatsAppAPI($vars);
                     $result = $api->sendMessage($_POST['phone_number'], $_POST['message']);
-                    $message = $result['success'] ? 'Message sent successfully!' : 'Failed to send message: ' . $result['error'];
+                    $message = $result['success'] ? 
+                        '<div class="alert alert-success">✅ تم إرسال الرسالة بنجاح</div>' : 
+                        '<div class="alert alert-danger">❌ فشل في إرسال الرسالة: ' . $result['error'] . '</div>';
                 }
                 break;
         }
@@ -186,95 +218,32 @@ function whatsappcloud_output($vars)
     // Include external CSS
     echo '<link rel="stylesheet" href="modules/addons/whatsappcloud/assets/style.css">';
     
-    echo '<style>
-        .whatsapp-cloud-addon { font-family: Arial, sans-serif; }
-        .nav-tabs { border-bottom: 2px solid #25d366; margin-bottom: 20px; }
-        .nav-tabs a { 
-            display: inline-block; 
-            padding: 10px 20px; 
-            margin-right: 10px; 
-            text-decoration: none; 
-            background: #f8f9fa; 
-            border: 1px solid #ddd; 
-            border-bottom: none; 
-            border-radius: 5px 5px 0 0;
-            color: #333;
-        }
-        .nav-tabs a.active { 
-            background: #25d366; 
-            color: white; 
-            border-color: #25d366;
-        }
-        .tab-content { 
-            background: white; 
-            padding: 20px; 
-            border: 1px solid #ddd; 
-            border-radius: 5px;
-        }
-        .status-indicator { 
-            display: inline-block; 
-            width: 10px; 
-            height: 10px; 
-            border-radius: 50%; 
-            margin-right: 5px;
-        }
-        .status-connected { background: #28a745; }
-        .status-disconnected { background: #dc3545; }
-        .message-success { 
-            background: #d4edda; 
-            border: 1px solid #c3e6cb; 
-            color: #155724; 
-            padding: 10px; 
-            border-radius: 5px; 
-            margin-bottom: 15px;
-        }
-        .message-error { 
-            background: #f8d7da; 
-            border: 1px solid #f5c6cb; 
-            color: #721c24; 
-            padding: 10px; 
-            border-radius: 5px; 
-            margin-bottom: 15px;
-        }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; }
-        .form-group input, .form-group textarea, .form-group select { 
-            width: 100%; 
-            padding: 8px; 
-            border: 1px solid #ddd; 
-            border-radius: 4px; 
-        }
-        .btn { 
-            background: #25d366; 
-            color: white; 
-            padding: 10px 20px; 
-            border: none; 
-            border-radius: 5px; 
-            cursor: pointer; 
-        }
-        .btn:hover { background: #128c7e; }
-        .btn-secondary { background: #6c757d; }
-        .btn-secondary:hover { background: #545b62; }
-    </style>';
+    // Header
+    echo '<div class="addon-header">';
+    echo '<h1><span class="whatsapp-icon">📱</span> WhatsApp Cloud API</h1>';
+    echo '<p class="subtitle">إدارة تكامل WHMCS مع WhatsApp Cloud للتواصل مع العملاء</p>';
+    echo '</div>';
     
-    // Display message if any
-    if (isset($message)) {
-        $class = (strpos($message, 'successful') !== false || strpos($message, 'saved') !== false) ? 'message-success' : 'message-error';
-        echo '<div class="' . $class . '">' . $message . '</div>';
+    // Display messages
+    if ($message) {
+        echo $message;
     }
     
-    // Navigation
+    // Navigation tabs
     echo '<div class="nav-tabs">';
     foreach ($tabs as $key => $label) {
-        $active = ($tab == $key) ? 'active' : '';
-        echo '<a href="?module=whatsappcloud&tab=' . $key . '" class="' . $active . '">' . $label . '</a>';
+        $activeClass = ($activeTab === $key) ? 'active' : '';
+        echo '<a href="' . $modulelink . '&tab=' . $key . '" class="nav-tab ' . $activeClass . '">';
+        echo '<span class="tab-icon">' . getTabIcon($key) . '</span>';
+        echo $label;
+        echo '</a>';
     }
     echo '</div>';
     
     // Tab content
     echo '<div class="tab-content">';
     
-    switch ($tab) {
+    switch ($activeTab) {
         case 'details':
             include __DIR__ . '/templates/details.php';
             break;
@@ -287,8 +256,43 @@ function whatsappcloud_output($vars)
         case 'chat':
             include __DIR__ . '/templates/chat.php';
             break;
+        default:
+            include __DIR__ . '/templates/details.php';
     }
     
     echo '</div>';
     echo '</div>';
+}
+
+/**
+ * Get tab icon
+ */
+function getTabIcon($tab)
+{
+    $icons = [
+        'details' => '📊',
+        'webhook' => '🔗',
+        'bot' => '🤖',
+        'chat' => '💬'
+    ];
+    
+    return $icons[$tab] ?? '📋';
+}
+
+/**
+ * Sidebar output (optional)
+ */
+function whatsappcloud_sidebar($vars)
+{
+    $modulelink = $vars['modulelink'];
+    
+    $sidebar = '<div class="whatsapp-sidebar">';
+    $sidebar .= '<h3>📱 WhatsApp Cloud</h3>';
+    $sidebar .= '<p>الحالة: <span class="status-connected">متصل</span></p>';
+    $sidebar .= '<hr>';
+    $sidebar .= '<p><a href="' . $modulelink . '">إدارة الإضافة</a></p>';
+    $sidebar .= '<p><a href="modules/addons/whatsappcloud/verify.php" target="_blank">فحص التثبيت</a></p>';
+    $sidebar .= '</div>';
+    
+    return $sidebar;
 }

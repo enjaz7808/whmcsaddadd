@@ -3,382 +3,363 @@
  * Chat Tab Template
  */
 
-// Handle sending messages
-if (isset($_POST['send_message']) && !empty($_POST['phone_number']) && !empty($_POST['message'])) {
-    $api = new WhatsAppAPI($vars);
-    $result = $api->sendMessage($_POST['phone_number'], $_POST['message']);
+// Get recent conversations
+$conversations = [];
+$messages = [];
+
+try {
+    $query = "SELECT c.*, COUNT(m.id) as message_count 
+              FROM mod_whatsappcloud_conversations c 
+              LEFT JOIN mod_whatsappcloud_messages m ON c.id = m.conversation_id 
+              GROUP BY c.id 
+              ORDER BY c.updated_at DESC 
+              LIMIT 20";
+    $result = full_query($query);
     
-    if ($result['success']) {
-        $successMessage = 'تم إرسال الرسالة بنجاح! ✅';
-    } else {
-        $errorMessage = 'فشل في إرسال الرسالة: ' . $result['error'];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $conversations[] = $row;
+        }
     }
+} catch (Exception $e) {
+    // Handle database errors
 }
 
-// Get conversations with pagination
-$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$limit = 10;
-$offset = ($page - 1) * $limit;
+// Get selected conversation messages
+$selectedConversation = null;
+$conversationId = $_GET['conversation_id'] ?? null;
 
-$query = "SELECT c.*, 
-                 (SELECT COUNT(*) FROM mod_whatsappcloud_messages m WHERE m.conversation_id = c.id) as message_count,
-                 (SELECT m.content FROM mod_whatsappcloud_messages m WHERE m.conversation_id = c.id ORDER BY m.timestamp DESC LIMIT 1) as last_message,
-                 (SELECT m.timestamp FROM mod_whatsappcloud_messages m WHERE m.conversation_id = c.id ORDER BY m.timestamp DESC LIMIT 1) as last_message_time
-          FROM mod_whatsappcloud_conversations c 
-          ORDER BY c.updated_at DESC 
-          LIMIT $limit OFFSET $offset";
-
-$conversations = full_query($query);
-
-// Get total count for pagination
-$countQuery = "SELECT COUNT(*) as total FROM mod_whatsappcloud_conversations";
-$countResult = full_query($countQuery);
-$totalConversations = $countResult->fetch_assoc()['total'];
-$totalPages = ceil($totalConversations / $limit);
+if ($conversationId) {
+    foreach ($conversations as $conv) {
+        if ($conv['id'] == $conversationId) {
+            $selectedConversation = $conv;
+            break;
+        }
+    }
+    
+    if ($selectedConversation) {
+        try {
+            $query = "SELECT * FROM mod_whatsappcloud_messages 
+                      WHERE conversation_id = ? 
+                      ORDER BY created_at ASC";
+            $stmt = mysqli_prepare($GLOBALS['dbh'], $query);
+            mysqli_stmt_bind_param($stmt, 'i', $conversationId);
+            mysqli_stmt_execute($stmt);
+            $result = mysqli_stmt_get_result($stmt);
+            
+            if ($result) {
+                while ($row = mysqli_fetch_assoc($result)) {
+                    $messages[] = $row;
+                }
+            }
+        } catch (Exception $e) {
+            // Handle error
+        }
+    }
+}
 ?>
 
 <div class="chat-tab">
-    <h2>💬 إدارة المحادثات والرسائل</h2>
+    <h2>💬 إدارة المحادثات والدردشة</h2>
     
-    <!-- Success/Error Messages -->
-    <?php if (isset($successMessage)): ?>
-    <div class="message-success"><?php echo $successMessage; ?></div>
-    <?php endif; ?>
-    
-    <?php if (isset($errorMessage)): ?>
-    <div class="message-error"><?php echo $errorMessage; ?></div>
-    <?php endif; ?>
-    
-    <!-- Quick Send Message -->
-    <div class="quick-send" style="background: #ffffff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h3>📤 إرسال رسالة سريعة</h3>
+    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px; height: 700px;">
         
-        <form method="post" style="margin-top: 15px;">
+        <!-- Conversations List -->
+        <div class="info-card" style="margin-bottom: 0;">
+            <h3>📋 المحادثات</h3>
+            
+            <div style="max-height: 600px; overflow-y: auto;">
+                <?php if (empty($conversations)): ?>
+                    <div style="text-align: center; color: #6c757d; padding: 20px;">
+                        📭 لا توجد محادثات حتى الآن<br>
+                        <small>ستظهر هنا المحادثات عند استقبال رسائل</small>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($conversations as $conv): ?>
+                        <div class="conversation-item" 
+                             style="padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 6px; margin-bottom: 5px; <?php echo $selectedConversation && $selectedConversation['id'] == $conv['id'] ? 'background: #e3f2fd; border-color: #2196F3;' : ''; ?>"
+                             onclick="selectConversation(<?php echo $conv['id']; ?>)">
+                            
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="contact-avatar" style="width: 40px; height: 40px; background: #25D366; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                                    <?php echo strtoupper(substr($conv['contact_name'] ?? 'U', 0, 1)); ?>
+                                </div>
+                                
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        <?php echo htmlspecialchars($conv['contact_name'] ?? $conv['phone_number']); ?>
+                                    </div>
+                                    
+                                    <div style="font-size: 12px; color: #6c757d; display: flex; justify-content: space-between;">
+                                        <span><?php echo htmlspecialchars($conv['phone_number']); ?></span>
+                                        <span class="status-badge status-<?php echo $conv['status']; ?>" style="padding: 2px 6px; border-radius: 10px; font-size: 10px;">
+                                            <?php 
+                                            $statusLabels = [
+                                                'pending' => 'في الانتظار',
+                                                'active' => 'نشط',
+                                                'completed' => 'مكتمل'
+                                            ];
+                                            echo $statusLabels[$conv['status']] ?? $conv['status'];
+                                            ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <div style="font-size: 11px; color: #999; margin-top: 2px;">
+                                        💬 <?php echo $conv['message_count']; ?> رسالة | 
+                                        🌍 <?php echo $conv['language'] === 'ar' ? 'عربي' : 'English'; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Chat Interface -->
+        <div class="chat-container">
+            <?php if ($selectedConversation): ?>
+                <!-- Chat Header -->
+                <div class="chat-header">
+                    <div class="contact-avatar" style="width: 35px; height: 35px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                        <?php echo strtoupper(substr($selectedConversation['contact_name'] ?? 'U', 0, 1)); ?>
+                    </div>
+                    
+                    <div>
+                        <div style="font-weight: 600;">
+                            <?php echo htmlspecialchars($selectedConversation['contact_name'] ?? $selectedConversation['phone_number']); ?>
+                        </div>
+                        <div style="font-size: 12px; opacity: 0.9;">
+                            📞 <?php echo htmlspecialchars($selectedConversation['phone_number']); ?> | 
+                            🌍 <?php echo $selectedConversation['language'] === 'ar' ? 'عربي' : 'English'; ?>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-right: auto;">
+                        <span class="status-badge status-<?php echo $selectedConversation['status']; ?>" style="padding: 4px 8px; border-radius: 12px; font-size: 11px; background: rgba(255,255,255,0.2);">
+                            <?php 
+                            $statusLabels = [
+                                'pending' => 'في الانتظار',
+                                'active' => 'نشط', 
+                                'completed' => 'مكتمل'
+                            ];
+                            echo $statusLabels[$selectedConversation['status']] ?? $selectedConversation['status'];
+                            ?>
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Messages Area -->
+                <div class="chat-messages" id="chat-messages">
+                    <?php if (empty($messages)): ?>
+                        <div style="text-align: center; color: #6c757d; padding: 40px;">
+                            💬 لا توجد رسائل في هذه المحادثة<br>
+                            <small>ابدأ محادثة بإرسال رسالة أدناه</small>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($messages as $msg): ?>
+                            <div class="message <?php echo $msg['direction']; ?>">
+                                <div class="message-content">
+                                    <?php 
+                                    if ($msg['message_type'] === 'text') {
+                                        echo nl2br(htmlspecialchars($msg['content']));
+                                    } else {
+                                        echo '<em>رسالة تفاعلية أو ملف</em>';
+                                    }
+                                    ?>
+                                </div>
+                                <div class="message-time">
+                                    <?php echo date('H:i', strtotime($msg['created_at'])); ?>
+                                    <?php if ($msg['direction'] === 'outbound'): ?>
+                                        <span style="margin-right: 5px;">
+                                            <?php 
+                                            $statusIcons = [
+                                                'sent' => '✓',
+                                                'delivered' => '✓✓',
+                                                'read' => '✓✓',
+                                                'failed' => '❌'
+                                            ];
+                                            echo $statusIcons[$msg['status']] ?? '⏳';
+                                            ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Message Input -->
+                <form method="post" class="chat-input">
+                    <input type="hidden" name="tab" value="chat">
+                    <input type="hidden" name="phone_number" value="<?php echo htmlspecialchars($selectedConversation['phone_number']); ?>">
+                    
+                    <input type="text" name="message" placeholder="اكتب رسالتك هنا..." required 
+                           style="flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 20px; margin-bottom: 0;">
+                    
+                    <button type="submit" name="send_message" value="1" class="btn" style="border-radius: 50%; width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                        📤
+                    </button>
+                </form>
+                
+            <?php else: ?>
+                <!-- No Conversation Selected -->
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #6c757d; text-align: center;">
+                    <div>
+                        <div style="font-size: 48px; margin-bottom: 15px;">💬</div>
+                        <h4>اختر محادثة للبدء</h4>
+                        <p>حدد محادثة من القائمة لعرض الرسائل والتواصل مع العميل</p>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Quick Send -->
+    <div class="info-card" style="margin-top: 20px;">
+        <h3>⚡ إرسال سريع</h3>
+        
+        <form method="post" style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
             <input type="hidden" name="tab" value="chat">
             
-            <div style="display: grid; grid-template-columns: 200px 1fr 150px; gap: 15px; align-items: end;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label>رقم الهاتف:</label>
-                    <input type="text" name="phone_number" placeholder="966xxxxxxxxx" required
-                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                </div>
-                
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label>الرسالة:</label>
-                    <textarea name="message" rows="3" placeholder="اكتب رسالتك هنا..." required
-                              style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
-                </div>
-                
-                <div>
-                    <button type="submit" name="send_message" value="1" class="btn" style="width: 100%; height: 76px;">
-                        📤 إرسال
-                    </button>
-                </div>
+            <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                <label>📱 رقم الواتساب:</label>
+                <input type="text" name="phone_number" placeholder="+966xxxxxxxxx" required 
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
             </div>
+            
+            <div class="form-group" style="flex: 2; min-width: 300px; margin-bottom: 0;">
+                <label>💬 الرسالة:</label>
+                <input type="text" name="message" placeholder="اكتب رسالتك هنا..." required 
+                       style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            
+            <button type="submit" name="send_message" value="1" class="btn">
+                📤 إرسال
+            </button>
         </form>
     </div>
     
-    <!-- Quick Message Templates -->
-    <div class="message-templates" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-        <h4>📋 قوالب الرسائل السريعة</h4>
+    <!-- Message Templates -->
+    <div class="info-card">
+        <h3>📝 قوالب الرسائل</h3>
         
-        <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
-            <button class="template-btn" onclick="insertTemplate('مرحباً! كيف يمكننا مساعدتك اليوم؟')" 
-                    style="background: #e3f2fd; border: 1px solid #2196f3; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 12px;">
-                🤝 ترحيب
-            </button>
-            
-            <button class="template-btn" onclick="insertTemplate('شكراً لتواصلك معنا. سيتم الرد عليك قريباً.')" 
-                    style="background: #e8f5e8; border: 1px solid #4caf50; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 12px;">
-                🙏 شكر
-            </button>
-            
-            <button class="template-btn" onclick="insertTemplate('للمزيد من المعلومات، يرجى زيارة موقعنا الإلكتروني.')" 
-                    style="background: #fff3e0; border: 1px solid #ff9800; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 12px;">
-                ℹ️ معلومات
-            </button>
-            
-            <button class="template-btn" onclick="insertTemplate('تم حل المشكلة. هل تحتاج لأي مساعدة أخرى؟')" 
-                    style="background: #f3e5f5; border: 1px solid #9c27b0; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 12px;">
-                ✅ حل المشكلة
-            </button>
-        </div>
-    </div>
-    
-    <!-- Conversations List -->
-    <div class="conversations-list" style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 8px;">
-        <div style="padding: 20px; border-bottom: 1px solid #dee2e6; background: #f8f9fa; border-radius: 8px 8px 0 0;">
-            <h3 style="margin: 0;">📋 قائمة المحادثات (<?php echo number_format($totalConversations); ?> محادثة)</h3>
-        </div>
-        
-        <?php if ($conversations && $conversations->num_rows > 0): ?>
-        <div class="conversations-table">
-            <?php while ($conversation = $conversations->fetch_assoc()): ?>
-            <?php
-                $lastMessage = $conversation['last_message'] ? json_decode($conversation['last_message'], true) : null;
-                $lastMessageText = '';
-                
-                if ($lastMessage) {
-                    if ($lastMessage['type'] === 'text') {
-                        $lastMessageText = substr($lastMessage['text']['body'] ?? '', 0, 50) . '...';
-                    } else {
-                        $lastMessageText = '📎 ' . ucfirst($lastMessage['type']);
-                    }
-                }
-            ?>
-            
-            <div class="conversation-item" style="padding: 15px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; hover:background-color: #f8f9fa;" 
-                 onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='white'">
-                
-                <!-- Status Indicator -->
-                <div style="margin-left: 15px;">
-                    <div class="status-indicator <?php echo $conversation['status'] === 'active' ? 'status-connected' : ($conversation['status'] === 'pending' ? '' : 'status-disconnected'); ?>" 
-                         style="width: 12px; height: 12px;"></div>
+        <div class="config-grid">
+            <div class="template-group">
+                <h4>🎉 رسائل ترحيبية</h4>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    مرحباً بك! نحن هنا لمساعدتك. كيف يمكننا خدمتك؟
                 </div>
-                
-                <!-- Contact Info -->
-                <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; margin-bottom: 5px;">
-                        <strong style="margin-left: 10px;">📞 <?php echo htmlspecialchars($conversation['phone_number']); ?></strong>
-                        
-                        <span style="background: <?php echo $conversation['status'] === 'active' ? '#d4edda' : ($conversation['status'] === 'pending' ? '#fff3cd' : '#f8d7da'); ?>; 
-                                     color: <?php echo $conversation['status'] === 'active' ? '#155724' : ($conversation['status'] === 'pending' ? '#856404' : '#721c24'); ?>; 
-                                     padding: 2px 8px; border-radius: 10px; font-size: 11px;">
-                            <?php 
-                            $statusLabels = ['active' => 'نشط', 'pending' => 'معلق', 'completed' => 'مكتمل'];
-                            echo $statusLabels[$conversation['status']] ?? $conversation['status'];
-                            ?>
-                        </span>
-                        
-                        <span style="margin-right: 10px; font-size: 12px; color: #6c757d;">
-                            <?php echo $conversation['language'] === 'ar' ? '🇸🇦 عربي' : '🇺🇸 English'; ?>
-                        </span>
-                    </div>
-                    
-                    <div style="color: #6c757d; font-size: 14px;">
-                        <?php if ($lastMessageText): ?>
-                            💬 <?php echo htmlspecialchars($lastMessageText); ?>
-                        <?php else: ?>
-                            لا توجد رسائل بعد
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div style="font-size: 12px; color: #999; margin-top: 3px;">
-                        📊 <?php echo number_format($conversation['message_count']); ?> رسالة
-                        <?php if ($conversation['last_message_time']): ?>
-                            • آخر نشاط: <?php echo date('Y-m-d H:i', strtotime($conversation['last_message_time'])); ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <!-- Action Buttons -->
-                <div style="display: flex; gap: 5px;">
-                    <button onclick="viewConversation(<?php echo $conversation['id']; ?>, '<?php echo htmlspecialchars($conversation['phone_number']); ?>')" 
-                            class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">
-                        👁️ عرض
-                    </button>
-                    
-                    <button onclick="quickReply('<?php echo htmlspecialchars($conversation['phone_number']); ?>')" 
-                            class="btn" style="padding: 5px 10px; font-size: 12px;">
-                        💬 رد
-                    </button>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    شكراً لتواصلك معنا. سيتم الرد عليك في أقرب وقت ممكن.
                 </div>
             </div>
-            <?php endwhile; ?>
-        </div>
-        
-        <!-- Pagination -->
-        <?php if ($totalPages > 1): ?>
-        <div style="padding: 15px 20px; border-top: 1px solid #dee2e6; background: #f8f9fa; display: flex; justify-content: center; align-items: center; gap: 10px;">
-            <?php if ($page > 1): ?>
-                <a href="?module=whatsappcloud&tab=chat&page=<?php echo $page - 1; ?>" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">⬅️ السابق</a>
-            <?php endif; ?>
             
-            <span style="margin: 0 15px; color: #6c757d;">
-                صفحة <?php echo $page; ?> من <?php echo $totalPages; ?>
-            </span>
-            
-            <?php if ($page < $totalPages): ?>
-                <a href="?module=whatsappcloud&tab=chat&page=<?php echo $page + 1; ?>" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">التالي ➡️</a>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
-        
-        <?php else: ?>
-        <div style="padding: 40px; text-align: center; color: #6c757d;">
-            <div style="font-size: 48px; margin-bottom: 15px;">💬</div>
-            <h4>لا توجد محادثات بعد</h4>
-            <p>سيتم عرض المحادثات هنا عندما يبدأ العملاء بالتواصل معك</p>
-        </div>
-        <?php endif; ?>
-    </div>
-    
-    <!-- Chat Statistics -->
-    <div class="chat-stats" style="margin-top: 20px; background: #e3f2fd; padding: 20px; border-radius: 8px;">
-        <h3>📊 إحصائيات المحادثات</h3>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
-            <?php
-            $statsQuery = "SELECT 
-                COUNT(*) as total,
-                COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
-                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-                COUNT(CASE WHEN language = 'ar' THEN 1 END) as arabic,
-                COUNT(CASE WHEN language = 'en' THEN 1 END) as english,
-                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today
-                FROM mod_whatsappcloud_conversations";
-            $statsResult = full_query($statsQuery);
-            $chatStats = $statsResult->fetch_assoc();
-            ?>
-            
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #007bff;">
-                    <?php echo number_format($chatStats['total'] ?? 0); ?>
+            <div class="template-group">
+                <h4>💼 رسائل مبيعات</h4>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    لدينا عروض خاصة حالياً! هل تود معرفة المزيد؟
                 </div>
-                <div style="color: #6c757d; font-size: 14px;">إجمالي المحادثات</div>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    يمكنك الاطلاع على جميع خدماتنا من خلال موقعنا الإلكتروني.
+                </div>
             </div>
             
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #28a745;">
-                    <?php echo number_format($chatStats['active'] ?? 0); ?>
+            <div class="template-group">
+                <h4>🎫 رسائل دعم فني</h4>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    تم فتح تذكرة دعم برقم #{{ticket_id}}. سيتم التواصل معك قريباً.
                 </div>
-                <div style="color: #6c757d; font-size: 14px;">المحادثات النشطة</div>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    تم حل المشكلة بنجاح. هل تحتاج لأي مساعدة إضافية؟
+                </div>
             </div>
             
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #ffc107;">
-                    <?php echo number_format($chatStats['pending'] ?? 0); ?>
+            <div class="template-group">
+                <h4>📞 رسائل متابعة</h4>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    كيف كانت تجربتك معنا؟ نحن نقدر ملاحظاتك.
                 </div>
-                <div style="color: #6c757d; font-size: 14px;">محادثات معلقة</div>
+                <div class="template-item" onclick="useTemplate(this)" style="background: #f8f9fa; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; border: 1px solid #dee2e6;">
+                    شكراً لاختيارك خدماتنا. نتطلع لخدمتك مرة أخرى.
+                </div>
             </div>
-            
-            <div class="stat-card" style="background: white; padding: 15px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #dc3545;">
-                    <?php echo number_format($chatStats['today'] ?? 0); ?>
-                </div>
-                <div style="color: #6c757d; font-size: 14px;">محادثات اليوم</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Conversation Modal -->
-<div id="conversationModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; width: 80%; max-width: 800px; height: 80%; border-radius: 8px; display: flex; flex-direction: column;">
-        <!-- Modal Header -->
-        <div style="padding: 20px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0;">💬 محادثة مع <span id="modalPhoneNumber"></span></h3>
-            <button onclick="closeConversationModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">✕</button>
-        </div>
-        
-        <!-- Messages Area -->
-        <div id="messagesArea" style="flex: 1; padding: 20px; overflow-y: auto; background: #f8f9fa;">
-            <!-- Messages will be loaded here -->
-        </div>
-        
-        <!-- Reply Area -->
-        <div style="padding: 20px; border-top: 1px solid #dee2e6; background: white;">
-            <form onsubmit="sendReply(event)">
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="replyMessage" placeholder="اكتب ردك هنا..." required
-                           style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                    <button type="submit" class="btn">📤 إرسال</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
 
 <script>
-function insertTemplate(template) {
-    const messageTextarea = document.querySelector('textarea[name="message"]');
-    if (messageTextarea) {
-        messageTextarea.value = template;
-        messageTextarea.focus();
-    }
+function selectConversation(conversationId) {
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('conversation_id', conversationId);
+    window.location.href = currentUrl.toString();
 }
 
-function quickReply(phoneNumber) {
-    const phoneInput = document.querySelector('input[name="phone_number"]');
-    const messageTextarea = document.querySelector('textarea[name="message"]');
+function useTemplate(element) {
+    const templateText = element.textContent.trim();
+    const messageInputs = document.querySelectorAll('input[name="message"]');
     
-    if (phoneInput && messageTextarea) {
-        phoneInput.value = phoneNumber;
-        messageTextarea.focus();
-        messageTextarea.scrollIntoView({ behavior: 'smooth' });
-    }
-}
-
-function viewConversation(conversationId, phoneNumber) {
-    document.getElementById('modalPhoneNumber').textContent = phoneNumber;
-    document.getElementById('conversationModal').style.display = 'block';
+    messageInputs.forEach(input => {
+        input.value = templateText;
+        input.focus();
+    });
     
-    // Load messages via AJAX (placeholder)
-    document.getElementById('messagesArea').innerHTML = `
-        <div style="text-align: center; padding: 40px; color: #6c757d;">
-            <div style="font-size: 24px; margin-bottom: 10px;">📱</div>
-            <p>جاري تحميل الرسائل...</p>
-        </div>
-    `;
-    
-    // Simulate loading messages
+    // Highlight the selected template briefly
+    element.style.background = '#25D366';
+    element.style.color = 'white';
     setTimeout(() => {
-        document.getElementById('messagesArea').innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <div style="background: #e3f2fd; padding: 10px; border-radius: 8px; max-width: 70%; margin-bottom: 5px;">
-                    مرحباً، أحتاج مساعدة في خدماتكم
-                </div>
-                <div style="font-size: 12px; color: #6c757d;">العميل • منذ ساعتين</div>
-            </div>
-            
-            <div style="margin-bottom: 15px; text-align: left;">
-                <div style="background: #25d366; color: white; padding: 10px; border-radius: 8px; max-width: 70%; margin-bottom: 5px; margin-right: auto;">
-                    مرحباً! سعداء بتواصلك معنا. كيف يمكننا مساعدتك؟
-                </div>
-                <div style="font-size: 12px; color: #6c757d;">أنت • منذ ساعة</div>
-            </div>
-        `;
-    }, 1000);
+        element.style.background = '#f8f9fa';
+        element.style.color = '';
+    }, 500);
 }
 
-function closeConversationModal() {
-    document.getElementById('conversationModal').style.display = 'none';
-}
-
-function sendReply(event) {
-    event.preventDefault();
-    const message = document.getElementById('replyMessage').value;
-    const phoneNumber = document.getElementById('modalPhoneNumber').textContent;
-    
-    if (message.trim()) {
-        // Add message to chat (placeholder)
-        const messagesArea = document.getElementById('messagesArea');
-        messagesArea.innerHTML += `
-            <div style="margin-bottom: 15px; text-align: left;">
-                <div style="background: #25d366; color: white; padding: 10px; border-radius: 8px; max-width: 70%; margin-bottom: 5px; margin-right: auto;">
-                    ${message}
-                </div>
-                <div style="font-size: 12px; color: #6c757d;">أنت • الآن</div>
-            </div>
-        `;
-        
-        document.getElementById('replyMessage').value = '';
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-        
-        // Here you would send the actual message via AJAX
-        alert('تم إرسال الرسالة! (هذا مثال فقط)');
-    }
-}
-
-// Close modal when clicking outside
-document.getElementById('conversationModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeConversationModal();
+// Auto-scroll to bottom of messages
+document.addEventListener('DOMContentLoaded', function() {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 });
 
-// Auto-refresh conversations every 30 seconds
+// Auto-refresh messages every 30 seconds
 setInterval(function() {
-    // Add AJAX call to refresh conversations list
+    if (window.location.href.includes('conversation_id=')) {
+        // Only refresh if a conversation is selected
+        location.reload();
+    }
 }, 30000);
 </script>
+
+<style>
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-completed {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.conversation-item:hover {
+    background: #f8f9fa !important;
+}
+
+.template-item:hover {
+    background: #e9ecef !important;
+    border-color: #25D366 !important;
+}
+
+.message.outbound .message-time {
+    color: rgba(255,255,255,0.8);
+}
+
+.message.inbound .message-time {
+    color: #6c757d;
+}
+</style>
